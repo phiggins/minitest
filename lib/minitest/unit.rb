@@ -936,6 +936,7 @@ module MiniTest
         begin
           @passed = nil
           self.setup
+          self.class.setup_hooks.each {|h| h.call }
           self.__send__ self.__name__
           result = "." unless io?
           @passed = true
@@ -947,6 +948,7 @@ module MiniTest
         ensure
           begin
             self.teardown
+            self.class.teardown_hooks.each {|h| h.call }
           rescue *PASSTHROUGH_EXCEPTIONS
             raise
           rescue Exception => e
@@ -978,8 +980,11 @@ module MiniTest
 
       reset
 
+      # TODO: REFACTOR!!1
       def self.inherited klass # :nodoc:
         @@test_suites[klass] = true
+        klass.instance_variable_set(:@setup_hooks, setup_hooks.dup)
+        klass.instance_variable_set(:@teardown_hooks, teardown_hooks.dup)
       end
 
       ##
@@ -1025,6 +1030,28 @@ module MiniTest
       # Runs after every test. Use this to refactor test cleanup.
 
       def teardown; end
+
+      def self.setup_hooks
+        @setup_hooks = [] unless defined? @setup_hooks
+
+        @setup_hooks
+      end
+
+      def self.add_setup_hook arg=nil, &block
+        hook = arg || block
+        setup_hooks << hook
+      end
+
+      def self.teardown_hooks
+        @teardown_hooks = [] unless defined? @teardown_hooks
+
+        @teardown_hooks
+      end
+
+      def self.add_teardown_hook arg=nil, &block
+        hook = arg || block
+        teardown_hooks << hook
+      end
 
       include MiniTest::Assertions
     end # class TestCase

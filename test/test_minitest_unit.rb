@@ -406,6 +406,108 @@ Finished tests in 0.00
     assert_report expected
   end
 
+  def test_setup_hooks
+    call_order = []
+
+    tc = Class.new(MiniTest::Unit::TestCase) do
+      define_method :setup do
+        super()
+        call_order << :method
+      end
+
+      define_method :test2 do
+        call_order << :test2
+      end
+
+      define_method :test1 do
+        call_order << :test1
+      end
+    end
+
+    tc.add_setup_hook lambda { call_order << :proc }
+
+    tc.add_setup_hook do
+      call_order << :block
+    end
+
+    @tu.run %w[--seed 42]
+
+    expected = [:method, :proc, :block, :test1,
+                :method, :proc, :block, :test2 ]
+
+    assert_equal expected, call_order
+  end
+
+  def test_teardown_hooks
+    call_order = []
+
+    tc = Class.new(MiniTest::Unit::TestCase) do
+      define_method :teardown do
+        super()
+        call_order << :method
+      end
+
+      define_method :test2 do
+        call_order << :test2
+      end
+
+      define_method :test1 do
+        call_order << :test1
+      end
+    end
+
+    tc.add_teardown_hook lambda { call_order << :proc }
+
+    tc.add_teardown_hook do
+      call_order << :block
+    end
+
+    @tu.run %w[--seed 42]
+
+    expected = [:test1, :method, :proc, :block,
+                :test2, :method, :proc, :block ]
+
+    assert_equal expected, call_order
+  end
+
+  def test_setup_and_teardown_hooks_survive_inheritance
+    call_order = []
+
+    parent = Class.new(MiniTest::Unit::TestCase) do
+      define_method :setup do
+        super()
+        call_order << :setup_method
+      end
+
+      define_method :teardown do
+        super()
+        call_order << :teardown_method
+      end
+
+      define_method :test_something do
+        call_order << :test
+      end
+    end
+
+    parent.add_setup_hook do
+      call_order << :setup_hook
+    end
+
+    parent.add_teardown_hook do
+      call_order << :teardown_hook
+    end
+
+    child = Class.new(parent)
+
+    @tu.run %w[--seed 42]
+
+    # Once for the parent class, once for the child
+    expected = [:setup_method, :setup_hook, :test,
+                :teardown_method, :teardown_hook] * 2
+
+    assert_equal expected, call_order
+  end
+
   def util_expand_bt bt
     if RUBY_VERSION =~ /^1\.9/ then
       bt.map { |f| (f =~ /^\./) ? File.expand_path(f) : f }
