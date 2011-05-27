@@ -489,21 +489,19 @@ Finished tests in 0.00
       end
     end
 
-    parent.add_setup_hook do
-      call_order << :setup_hook
-    end
-
-    parent.add_teardown_hook do
-      call_order << :teardown_hook
-    end
+    parent.add_setup_hook     { call_order << :setup_hook }
+    parent.add_teardown_hook  { call_order << :teardown_hook }
 
     child = Class.new(parent)
 
+    parent.add_setup_hook     { call_order << :setup_after }
+    parent.add_teardown_hook  { call_order << :teardown_after }
+    
     @tu.run %w[--seed 42]
 
     # Once for the parent class, once for the child
-    expected = [:setup_method, :setup_hook, :test,
-                :teardown_method, :teardown_hook] * 2
+    expected = [:setup_method, :setup_hook, :setup_after, :test,
+                :teardown_method, :teardown_hook, :teardown_after] * 2
 
     assert_equal expected, call_order
   end
