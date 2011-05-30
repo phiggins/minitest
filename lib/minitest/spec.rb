@@ -145,7 +145,7 @@ class MiniTest::Spec < MiniTest::Unit::TestCase
     @@current_spec
   end
 
-  def self.children
+  def self.children # :nodoc:
     @children ||= []
   end
 
@@ -161,25 +161,6 @@ class MiniTest::Spec < MiniTest::Unit::TestCase
   end
 
   ##
-  # Spec users want setup/teardown to be inherited and NOTHING ELSE.
-  # It is almost like method reuse is lost on them.
-
-  def self.define_inheritable_method name, &block # :nodoc:
-    # regular super() warns
-    super_method = self.superclass.instance_method name
-
-    teardown     = name.to_s == "teardown"
-    super_before = super_method && ! teardown
-    super_after  = super_method && teardown
-
-    define_method name do
-      super_method.bind(self).call if super_before
-      instance_eval(&block)
-      super_method.bind(self).call if super_after
-    end
-  end
-
-  ##
   # Define a 'before' action. Inherits the way normal methods should.
   #
   # NOTE: +type+ is ignored and is only there to make porting easier.
@@ -188,7 +169,8 @@ class MiniTest::Spec < MiniTest::Unit::TestCase
 
   def self.before type = :each, &block
     raise "unsupported before type: #{type}" unless type == :each
-    define_inheritable_method :setup, &block
+
+    add_setup_hook {|tc| tc.instance_eval(&block) }
   end
 
   ##
@@ -200,7 +182,8 @@ class MiniTest::Spec < MiniTest::Unit::TestCase
 
   def self.after type = :each, &block
     raise "unsupported after type: #{type}" unless type == :each
-    define_inheritable_method :teardown, &block
+
+    add_teardown_hook {|tc| tc.instance_eval(&block) }
   end
 
   ##
