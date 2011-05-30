@@ -936,7 +936,7 @@ module MiniTest
         begin
           @passed = nil
           self.setup
-          self.class.run_setup_hooks
+          self.run_setup_hooks
           self.__send__ self.__name__
           result = "." unless io?
           @passed = true
@@ -948,7 +948,7 @@ module MiniTest
         ensure
           begin
             self.teardown
-            self.class.run_teardown_hooks
+            self.run_teardown_hooks
           rescue *PASSTHROUGH_EXCEPTIONS
             raise
           rescue Exception => e
@@ -982,6 +982,7 @@ module MiniTest
 
       def self.inherited klass # :nodoc:
         @@test_suites[klass] = true
+        klass.reset_setup_teardown_hooks
       end
 
       ##
@@ -1028,48 +1029,61 @@ module MiniTest
 
       def teardown; end
 
-      def self.setup_hooks
-        @setup_hooks = [] unless defined? @setup_hooks
-
-        @setup_hooks
+      def self.reset_setup_teardown_hooks # :nodoc:
+        @setup_hooks = []
+        @teardown_hooks = []
       end
+
+      reset_setup_teardown_hooks
 
       def self.add_setup_hook arg=nil, &block
         hook = arg || block
-        setup_hooks << hook
+        @setup_hooks << hook
       end
 
-      def self.run_setup_hooks
-        hooks = if superclass.respond_to?(:setup_hooks)
-                  superclass.setup_hooks
-                else
-                  []
-                end
+      def self.setup_hooks # :nodoc:
+        supers =  if superclass.respond_to?(:setup_hooks)
+                    superclass.setup_hooks
+                  else
+                    []
+                  end
 
-        hooks += setup_hooks
-        hooks.each {|hook| hook.call }
+        supers + @setup_hooks
       end
 
-      def self.teardown_hooks
-        @teardown_hooks = [] unless defined? @teardown_hooks
-
-        @teardown_hooks
+      def run_setup_hooks # :nodoc:
+        self.class.setup_hooks.each do |hook|
+          if hook.respond_to?(:arity) && hook.arity == 1
+            hook.call(self)
+          else
+            hook.call
+          end
+        end
       end
 
       def self.add_teardown_hook arg=nil, &block
         hook = arg || block
-        teardown_hooks << hook
+        @teardown_hooks << hook
       end
 
-      def self.run_teardown_hooks
-        hooks = if superclass.respond_to?(:teardown_hooks)
-                  superclass.teardown_hooks
-                else
-                  []
-                end
+      def self.teardown_hooks # :nodoc:
+        supers =  if superclass.respond_to?(:teardown_hooks)
+                    superclass.teardown_hooks
+                  else
+                    []
+                  end
 
-        hooks += teardown_hooks
-        hooks.each {|hook| hook.call }
+        supers + @teardown_hooks
+      end
+
+      def run_teardown_hooks # :nodoc:
+        self.class.teardown_hooks.reverse.each do |hook|
+          if hook.respond_to?(:arity) && hook.arity == 1
+            hook.call(self)
+          else
+            hook.call
+          end
+        end
       end
 
       include MiniTest::Assertions

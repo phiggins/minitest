@@ -426,14 +426,19 @@ Finished tests in 0.00
 
     tc.add_setup_hook lambda { call_order << :proc }
 
-    tc.add_setup_hook do
+    argument = nil
+
+    tc.add_setup_hook do |arg|
+      argument = arg
       call_order << :block
     end
 
     @tu.run %w[--seed 42]
 
+    assert_kind_of tc, argument
+
     expected = [:method, :proc, :block, :test1,
-                :method, :proc, :block, :test2 ]
+                :method, :proc, :block, :test2]
 
     assert_equal expected, call_order
   end
@@ -458,14 +463,19 @@ Finished tests in 0.00
 
     tc.add_teardown_hook lambda { call_order << :proc }
 
-    tc.add_teardown_hook do
+    argument = nil
+
+    tc.add_teardown_hook do |arg|
+      argument = arg
       call_order << :block
     end
 
     @tu.run %w[--seed 42]
 
-    expected = [:test1, :method, :proc, :block,
-                :test2, :method, :proc, :block ]
+    assert_kind_of tc, argument
+
+    expected = [:test1, :method, :block, :proc,
+                :test2, :method, :block, :proc]
 
     assert_equal expected, call_order
   end
@@ -501,7 +511,7 @@ Finished tests in 0.00
 
     # Once for the parent class, once for the child
     expected = [:setup_method, :setup_hook, :setup_after, :test,
-                :teardown_method, :teardown_hook, :teardown_after] * 2
+                :teardown_method, :teardown_after, :teardown_hook] * 2
 
     assert_equal expected, call_order
   end
