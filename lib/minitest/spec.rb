@@ -77,22 +77,16 @@ module Kernel
   def describe desc, &block # :doc:
     stack = MiniTest::Spec.describe_stack
     name  = [stack.last, desc].compact.join("::")
-    sclas = stack.last || if Class === self && self < MiniTest::Spec then
-                            self
-                          else
-                            MiniTest::Spec.spec_type desc
-                          end
-    cls   = Class.new sclas
+    sclas = case
+            when stack.last 
+              stack.last
+            when Class === self && self < MiniTest::Spec
+              self
+            else
+              MiniTest::Spec.spec_type desc
+            end
 
-    sclas.children << cls unless cls == MiniTest::Spec
-
-    # :stopdoc:
-    # omg this sucks
-    (class << cls; self; end).send(:define_method, :to_s) { name }
-    (class << cls; self; end).send(:define_method, :desc) { desc }
-    # :startdoc:
-
-    cls.nuke_test_methods!
+    cls = sclas.create(name, desc)
 
     stack.push cls
     cls.class_eval(&block)
@@ -108,6 +102,10 @@ end
 # For a list of expectations, see Object.
 
 class MiniTest::Spec < MiniTest::Unit::TestCase
+  class << self
+    attr_reader :name, :desc
+  end
+
   ##
   # Contains pairs of matchers and Spec classes to be used to
   # calculate the superclass of a top-level describe. This allows for
@@ -131,9 +129,9 @@ class MiniTest::Spec < MiniTest::Unit::TestCase
   #
   #     spec_type("BlahController") # => MiniTest::Spec::Rails
 
-  def self.spec_type desc
-    desc = desc.to_s
-    TYPES.find { |re, klass| re === desc }.last
+  def self.spec_type foo
+    foo = foo.to_s
+    TYPES.find { |re, klass| re === foo }.last
   end
 
   @@describe_stack = []
@@ -208,6 +206,23 @@ class MiniTest::Spec < MiniTest::Unit::TestCase
     self.children.each do |mod|
       mod.send :undef_method, name if mod.public_method_defined? name
     end
+  end
+
+  def self.create(name, desc)
+    cls = Class.new(self) do
+      @name = name
+      @desc = desc
+
+      nuke_test_methods!
+    end
+
+    children << cls
+
+    cls
+  end
+
+  def self.to_s
+    defined?(@name) ? @name : super
   end
 end
 
